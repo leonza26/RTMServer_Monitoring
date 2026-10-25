@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MetalSupply AI - Sistem Manajemen Pembelian Logam & Pemantauan Supplier</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome / Lucide Icons alternative -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Leaflet CSS & JS for Geographic Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .glass-card {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .pulse-red {
+            animation: pulseRed 2s infinite;
+        }
+
+        @keyframes pulseRed {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+            }
+
+            50% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+            }
+        }
+
+        #map {
+            height: 380px;
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+
+    <!-- TOP NAVBAR -->
+    <header
+        class="sticky top-0 z-40 glass-card border-b border-slate-800 px-6 py-3.5 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div
+                class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <i class="fa-solid fa-industry text-white text-lg"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-lg tracking-tight text-white">MetalSupply<span
+                            class="text-blue-400">OS</span></h1>
+                    <span
+                        class="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Enterprise
+                        v2.4</span>
+                </div>
+                <p class="text-xs text-slate-400">Sistem Manajemen Pembelian Logam & Pemantauan 200+ Supplier</p>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard"
+                class="tab-btn px-3.5 py-2 rounded-lg text-xs font-medium transition-all bg-blue-600 text-white shadow">
+                <i class="fa-solid fa-chart-pie mr-1.5"></i>Dashboard & Alert
+            </button>
+            <button onclick="switchTab('suppliers')" id="tab-suppliers"
+                class="tab-btn px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-truck-ramp-box mr-1.5"></i>Database Supplier (204)
+            </button>
+            <button onclick="switchTab('forecasting')" id="tab-forecasting"
+                class="tab-btn px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-calendar-check mr-1.5"></i>Peramalan (Forecasting)
+            </button>
+            <button onclick="switchTab('revenue')" id="tab-revenue"
+                class="tab-btn px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-sack-dollar mr-1.5"></i>Omzet Pengiriman
+            </button>
+            <button onclick="switchTab('expansion')" id="tab-expansion"
+                class="tab-btn px-3.5 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all">
+                <i class="fa-solid fa-map-location-dot mr-1.5"></i>Analisis Ekspansi (AI)
+            </button>
+        </nav>
+
+        <!-- Right Action & Export Buttons -->
+        <div class="flex items-center gap-2.5">
+            <!-- Critical Anomaly Trigger Button -->
+            <button onclick="toggleAnomalyModal()"
+                class="relative px-3 py-2 rounded-xl bg-red-500/15 border border-red-500/40 text-red-300 hover:bg-red-500/25 text-xs font-semibold flex items-center gap-2 pulse-red transition">
+                <i class="fa-solid fa-triangle-exclamation text-red-400"></i>
+                <span>4 Anomali Kritis</span>
+            </button>
+
+            <!-- Export Dropdown -->
+            <div class="relative group">
+                <button
+                    class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-download text-blue-400"></i>
+                    <span>Ekspor Laporan</span>
+                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                </button>
+                <div
+                    class="absolute right-0 mt-2 w-48 rounded-xl glass-card border border-slate-700 shadow-2xl py-1.5 hidden group-hover:block z-50">
+                    <button onclick="triggerExport('PDF')"
+                        class="w-full px-4 py-2 text-left text-xs hover:bg-slate-800/80 flex items-center gap-2.5 text-slate-200">
+                        <i class="fa-solid fa-file-pdf text-red-400 w-4"></i> Ekspor Dokumen (.PDF)
+                    </button>
+                    <button onclick="triggerExport('Excel (.xlsx / .csv)')"
+                        class="w-full px-4 py-2 text-left text-xs hover:bg-slate-800/80 flex items-center gap-2.5 text-slate-200">
+                        <i class="fa-solid fa-file-excel text-emerald-400 w-4"></i> Spreadsheet (.XLSX / .CSV)
+                    </button>
+                    <button onclick="triggerExport('Gambar (PNG / JPG)')"
+                        class="w-full px-4 py-2 text-left text-xs hover:bg-slate-800/80 flex items-center gap-2.5 text-slate-200">
+                        <i class="fa-solid fa-image text-blue-400 w-4"></i> Tangkap Grafik (.PNG / .JPG)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 p-6 max-w-[1600px] w-full mx-auto space-y-6">
+
+        <!-- TOP KPI SUMMARY BAR -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="glass-card p-4 rounded-2xl">
+                <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                    <span>Total Supplier Terdaftar</span>
+                    <i class="fa-solid fa-users text-blue-400"></i>
+                </div>
+                <div class="text-2xl font-bold text-white">204 <span class="text-xs font-normal text-emerald-400">+6
+                        bulan ini</span></div>
+                <p class="text-[11px] text-slate-400 mt-1">186 Aktif • 18 Macet/Warning</p>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl">
+                <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                    <span>Total Tonase Bulan Ini</span>
+                    <i class="fa-solid fa-weight-hanging text-indigo-400"></i>
+                </div>
+                <div class="text-2xl font-bold text-white">18.420 <span
+                        class="text-sm font-medium text-slate-300">Ton</span></div>
+                <p class="text-[11px] text-emerald-400 mt-1"><i class="fa-solid fa-arrow-trend-up mr-1"></i>+8.4% dari
+                    target kuartal</p>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl">
+                <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+                    <span>Total Omzet Pembelian</span>
+                    <i class="fa-solid fa-coins text-amber-400"></i>
+                </div>
+                <div class="text-2xl font-bold text-white">Rp 142,8 <span
+                        class="text-sm font-medium text-slate-300">Miliar</span></div>
+                <p class="text-[11px] text-slate-400 mt-1">Rata-rata Rp 7,75 Jt / Ton</p>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl border-red-500/40 bg-red-950/15">
+                <div class="flex items-center justify-between text-red-300 text-xs mb-1">
+                    <span class="font-semibold">Anomali & Barang Macet</span>
+                    <i class="fa-solid fa-bell text-red-400 animate-bounce"></i>
+                </div>
+                <div class="text-2xl font-bold text-red-400">4 <span class="text-xs font-normal text-red-300">Kasus
+                        Kritis</span></div>
+                <p class="text-[11px] text-red-300/80 mt-1">2 Drop ≥100 Ton • 2 Jadwal Lewat</p>
+            </div>
+
+            <div class="glass-card p-4 rounded-2xl border-emerald-500/30 bg-emerald-950/10">
+                <div class="flex items-center justify-between text-emerald-300 text-xs mb-1">
+                    <span class="font-semibold">Rekomendasi Cabang (AI)</span>
+                    <i class="fa-solid fa-compass text-emerald-400"></i>
+                </div>
+                <div class="text-lg font-bold text-emerald-400 truncate">Surabaya & Medan</div>
+                <p class="text-[11px] text-emerald-300/80 mt-1">Skor Visibilitas Ekspansi: 94.2%</p>
+            </div>
+        </div>
+
+        <!-- ==========================================
+         SECTION 1: DASHBOARD & CORE ALERT SYSTEM
+         ========================================== -->
+        <section id="sec-dashboard" class="space-y-6">
+            <!-- Core Notification Banner (Fokus Utama Modul 3) -->
+            <div
+                class="glass-card rounded-2xl p-5 border-l-4 border-l-red-500 bg-gradient-to-r from-red-950/30 via-slate-900/90 to-slate-900/90">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
+                    <div>
+                        <span
+                            class="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-red-400 bg-red-500/10 px-2.5 py-1 rounded-md mb-1">
+                            <i class="fa-solid fa-radar"></i> Sistem Deteksi Anomali Real-Time (Core Alert System)
+                        </span>
+                        <h2 class="text-base font-bold text-white">Peringatan Ketidaksesuaian Pengiriman & Penurunan
+                            Tonase Drastis</h2>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400">Filter Ambang Batas:</span>
+                        <span
+                            class="text-xs font-semibold bg-slate-800 px-3 py-1 rounded-lg border border-slate-700 text-slate-200">Drop
+                            Tonase ≥ ±100 Ton</span>
+                        <span
+                            class="text-xs font-semibold bg-slate-800 px-3 py-1 rounded-lg border border-slate-700 text-slate-200">Keterlambatan
+                            > 24 Jam</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3.5" id="anomaly-cards-container">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Charts & Matrix Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Main Tonnage & Forecast Chart -->
+                <div class="lg:col-span-2 glass-card rounded-2xl p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+                        <div>
+                            <h3 class="font-bold text-sm text-white">Tren Pengiriman Logam: Aktual vs Peramalan
+                                (Forecasting) & Deteksi Drop</h3>
+                            <p class="text-xs text-slate-400">Memantau histori tonase keseluruhan dan prediksi kuartal
+                                berjalan (Ton)</p>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs">
+                            <span class="flex items-center gap-1.5 text-blue-400"><span
+                                    class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>Tonase
+                                Aktual</span>
+                            <span class="flex items-center gap-1.5 text-purple-400"><span
+                                    class="w-2.5 h-2.5 rounded-full bg-purple-400 inline-block"></span>Prediksi
+                                AI</span>
+                            <span class="flex items-center gap-1.5 text-red-400"><span
+                                    class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>Titik Anomali
+                                (-100t)</span>
+                        </div>
+                    </div>
+                    <div class="h-72">
+                        <canvas id="mainForecastChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Metal Type Composition & Matrix -->
+                <div class="glass-card rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-sm text-white mb-1">Distribusi Berat per Jenis Logam</h3>
+                        <p class="text-xs text-slate-400 mb-4">Proporsi tonase & status pemenuhan jadwal per komoditas
+                        </p>
+                        <div class="h-48">
+                            <canvas id="metalCompositionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-3 border-t border-slate-800 space-y-2 text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">1. Besi Scrap / Baja (HMS)</span>
+                            <span class="font-semibold text-white">8.240 Ton (Rp 61,8 M)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">2. Tembaga Murni (Cu)</span>
+                            <span class="font-semibold text-red-400"><i
+                                    class="fa-solid fa-circle-exclamation mr-1"></i>3.110 Ton (Macet 2 Supplier)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">3. Aluminium Ingot/Scrap</span>
+                            <span class="font-semibold text-white">4.520 Ton (Rp 38,4 M)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">4. Kuningan & Nikel</span>
+                            <span class="font-semibold text-white">2.550 Ton (Rp 24,1 M)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Matrix Table: Forecasting & Anomaly Status -->
+            <div class="glass-card rounded-2xl p-5">
+                <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div>
+                        <h3 class="font-bold text-sm text-white">Matriks Pemantauan Jadwal Kedatangan & Status Anomali
+                            Supplier Utama</h3>
+                        <p class="text-xs text-slate-400">Kombinasi variabel lokasi, frekuensi, berat per jenis, total
+                            tonase, harga per item, dan prediksi kedatangan</p>
+                    </div>
+                    <button onclick="switchTab('suppliers')" class="text-xs text-blue-400 hover:underline font-medium">
+                        Lihat Seluruh 204 Supplier <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-800 text-slate-400 uppercase text-[11px]">
+                                <th class="py-3 px-3">Nama Supplier & Lokasi</th>
+                                <th class="py-3 px-3">Frekuensi</th>
+                                <th class="py-3 px-3">Jenis Barang & Berat/Jenis</th>
+                                <th class="py-3 px-3">Total Tonase vs Standar</th>
+                                <th class="py-3 px-3">Harga / Kg</th>
+                                <th class="py-3 px-3">Omzet Pengiriman</th>
+                                <th class="py-3 px-3">Prediksi Kedatangan Berikutnya</th>
+                                <th class="py-3 px-3">Status & Alert</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-matrix-body" class="divide-y divide-slate-800/70">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+         SECTION 2: DATABASE 200+ SUPPLIER
+         ========================================== -->
+        <section id="sec-suppliers" class="space-y-6 hidden">
+            <div class="glass-card rounded-2xl p-5">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h2 class="text-base font-bold text-white">Master Database 204 Supplier Logam</h2>
+                        <p class="text-xs text-slate-400">Mencakup seluruh 9 variabel utama: Lokasi, Frekuensi, Jenis
+                            Logam, Berat per Jenis, Total Tonase, Harga/Item, dan Omzet</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input id="supplier-search" oninput="renderSupplierList()" type="text"
+                                placeholder="Cari nama supplier, kota, logam..."
+                                class="bg-slate-900 border border-slate-700 rounded-xl pl-8 pr-3.5 py-2 text-xs text-white focus:outline-none focus:border-blue-500 w-64" />
+                        </div>
+                        <select id="supplier-filter-status" onchange="renderSupplierList()"
+                            class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200">
+                            <option value="ALL">Semua Status (204)</option>
+                            <option value="ANOMALY">Anomali / Macet Saja</option>
+                            <option value="NORMAL">Normal / Tepat Jadwal</option>
+                        </select>
+                        <select id="supplier-filter-region" onchange="renderSupplierList()"
+                            class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200">
+                            <option value="ALL">Semua Wilayah</option>
+                            <option value="Jawa Timur">Jawa Timur</option>
+                            <option value="Sumatera Utara">Sumatera Utara</option>
+                            <option value="Jawa Barat">Jawa Barat</option>
+                            <option value="Riau">Riau</option>
+                            <option value="Kalimantan Timur">Kalimantan Timur</option>
+                            <option value="Sulawesi Selatan">Sulawesi Selatan</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto max-h-[540px]">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="sticky top-0 bg-slate-900 z-10">
+                            <tr class="border-b border-slate-700 text-slate-400 uppercase text-[11px]">
+                                <th class="py-3 px-3">ID & Nama Supplier</th>
+                                <th class="py-3 px-3">Lokasi & Koordinat Maps</th>
+                                <th class="py-3 px-3">Frekuensi Kirim</th>
+                                <th class="py-3 px-3">Jenis Barang & Berat/Jenis</th>
+                                <th class="py-3 px-3">Total Tonase</th>
+                                <th class="py-3 px-3">Harga / Item (Kg)</th>
+                                <th class="py-3 px-3">Omzet Uang (Rp)</th>
+                                <th class="py-3 px-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="full-supplier-tbody" class="divide-y divide-slate-800/60">
+                            <!-- Populated by JS (204 generated suppliers) -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+         SECTION 3: SISTEM PERAMALAN (FORECASTING)
+         ========================================== -->
+        <section id="sec-forecasting" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 glass-card rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <span
+                                class="text-[11px] font-bold uppercase text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-md">Modul
+                                1 • Predictive Arrival Engine</span>
+                            <h2 class="text-base font-bold text-white mt-1">Kalender Prakiraan Jadwal Kedatangan
+                                Supplier Selanjutnya</h2>
+                            <p class="text-xs text-slate-400">Dihitung otomatis dari rata-rata interval histori
+                                kedatangan (Moving Average & Deviasi Siklus)</p>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="border-b border-slate-800 text-slate-400 uppercase text-[11px]">
+                                    <th class="py-3 px-3">Supplier</th>
+                                    <th class="py-3 px-3">Pola Siklus Histori</th>
+                                    <th class="py-3 px-3">Kedatangan Terakhir</th>
+                                    <th class="py-3 px-3">Prediksi Kedatangan Berikutnya</th>
+                                    <th class="py-3 px-3">Estimasi Tonase</th>
+                                    <th class="py-3 px-3">Confidence AI</th>
+                                    <th class="py-3 px-3">Ketepatan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forecast-table-body" class="divide-y divide-slate-800/70">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Forecasting Logic Summary Card -->
+                <div class="glass-card rounded-2xl p-5 space-y-4">
+                    <h3 class="font-bold text-sm text-white flex items-center gap-2">
+                        <i class="fa-solid fa-microchip text-purple-400"></i> Parameter Model Peramalan
+                    </h3>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Sistem mempelajari 12 pengiriman terakhir dari masing-masing supplier untuk memprediksi tanggal
+                        tiba berikutnya dan memberi peringatan dini bila lewat dari jendela toleransi.
+                    </p>
+                    <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2.5 text-xs">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Akurasi Prediksi Jadwal (MAE):</span>
+                            <span class="font-semibold text-emerald-400">± 0.8 Hari (93.4%)</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Supplier Jadwal Harian (3-5 hr):</span>
+                            <span class="font-semibold text-white">48 Supplier</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Supplier Jadwal Mingguan (7-10 hr):</span>
+                            <span class="font-semibold text-white">112 Supplier</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Supplier Jadwal Dwimingguan:</span>
+                            <span class="font-semibold text-white">44 Supplier</span>
+                        </div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                        <div class="text-xs font-bold text-amber-300 mb-1">
+                            <i class="fa-solid fa-clock-rotate-left mr-1"></i> Prediksi Risiko Macet Minggu Depan
+                        </div>
+                        <p class="text-[11px] text-amber-200/80 leading-relaxed">
+                            Berdasarkan tren cuaca & keterlambatan pelabuhan, <strong>3 supplier dari Kalimantan
+                                Timur</strong> diprediksi mengalami mundur jadwal 2 hari pada pengiriman tanggal 21–23
+                            Oktober.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+         SECTION 4: LAPORAN OMZET PER PENGIRIMAN
+         ========================================== -->
+        <section id="sec-revenue" class="space-y-6 hidden">
+            <div class="glass-card rounded-2xl p-5">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+                    <div>
+                        <span
+                            class="text-[11px] font-bold uppercase text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-md">Modul
+                            4 • Transaction & Valuation Ledger</span>
+                        <h2 class="text-base font-bold text-white mt-1">Laporan Omzet & Nilai Transaksi Spesifik per
+                            Pengiriman</h2>
+                        <p class="text-xs text-slate-400">Kalkulasi otomatis per surat jalan/pengiriman: Σ (Berat Jenis
+                            Logam × Harga per Kg)</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                            <span class="text-slate-400">Total Nilai 10 Pengiriman Terakhir:</span>
+                            <span class="font-bold text-amber-400 ml-1.5">Rp 19.485.000.000</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-800 text-slate-400 uppercase text-[11px]">
+                                <th class="py-3 px-3">No. Pengiriman & Tanggal</th>
+                                <th class="py-3 px-3">Nama Supplier & Wilayah</th>
+                                <th class="py-3 px-3">Rincian Barang & Berat (Per Jenis)</th>
+                                <th class="py-3 px-3">Total Tonase</th>
+                                <th class="py-3 px-3">Harga Satuan / Kg</th>
+                                <th class="py-3 px-3">Total Omzet Pengiriman (Rp)</th>
+                                <th class="py-3 px-3">Selisih vs Pengiriman Lalu</th>
+                            </tr>
+                        </thead>
+                        <tbody id="shipment-revenue-body" class="divide-y divide-slate-800/70">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+         SECTION 5: ALGORITMA PELUANG EKSPANSI (SPATIAL AI)
+         ========================================== -->
+        <section id="sec-expansion" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Interactive Geographic Map -->
+                <div class="lg:col-span-2 glass-card rounded-2xl p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <div>
+                            <span
+                                class="text-[11px] font-bold uppercase text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md">Modul
+                                5 • Spatial & Tonnage Correlation Algorithm</span>
+                            <h2 class="text-base font-bold text-white mt-1">Peta Geografis Sebaran Supplier & Klaster
+                                Tonase Logam</h2>
+                            <p class="text-xs text-slate-400">Lingkaran hijau menunjukkan wilayah dengan kepadatan
+                                tonase tinggi & rekomendasi pembukaan cabang baru</p>
+                        </div>
+                    </div>
+                    <div id="map" class="border border-slate-700"></div>
+                </div>
+
+                <!-- Expansion Recommendation Ranking -->
+                <div class="glass-card rounded-2xl p-5 flex flex-col justify-between">
+                    <div>
+                        <h3 class="font-bold text-sm text-white mb-1">Hasil Algoritma Kelayakan Cabang Baru</h3>
+                        <p class="text-xs text-slate-400 mb-4">Korelasi antara <strong>Berat Tonase Wilayah (r =
+                                0.89)</strong>, jumlah supplier aktif, dan efisiensi biaya logistik</p>
+
+                        <div class="space-y-3" id="expansion-ranking-cards">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-slate-800 text-[11px] text-slate-400 leading-relaxed">
+                        <strong class="text-slate-200">Rumus Skor Ekspansi (Expansion Viability Index):</strong><br />
+                        <code>EVI = (0.5 × Norm_Tonase) + (0.3 × Kepadatan_Supplier) + (0.2 × Stabilitas_Pengiriman)</code>.
+                        Wilayah dengan EVI &gt; 80% sangat direkomendasikan untuk pembukaan cabang/depo baru.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==========================================
+       MODAL POP-UP: DETEKSI ANOMALI & BARANG MACET
+       ========================================== -->
+    <div id="anomaly-modal"
+        class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="glass-card border-2 border-red-500/50 rounded-2xl max-w-2xl w-full p-6 shadow-2xl">
+            <div class="flex items-start justify-between gap-4 border-b border-slate-800 pb-4">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-11 h-11 rounded-xl bg-red-500/20 border border-red-500/40 flex items-center justify-center text-red-400 text-xl">
+                        <i class="fa-solid fa-bell"></i>
+                    </div>
+                    <div>
+                        <span
+                            class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-red-500 text-white">Peringatan
+                            Prioritas Tinggi</span>
+                        <h3 class="text-lg font-bold text-white mt-0.5">Deteksi Anomali Pengiriman & Barang Macet</h3>
+                    </div>
+                </div>
+                <button onclick="toggleAnomalyModal()" class="text-slate-400 hover:text-white text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="my-4 space-y-3 max-h-[60vh] overflow-y-auto pr-1" id="modal-anomaly-list">
+                <!-- Populated by JS -->
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-800">
+                <p class="text-xs text-slate-400">Notifikasi ini muncul otomatis saat jadwal lewat batas toleransi atau
+                    tonase turun ≥ ±100 Ton.</p>
+                <div class="flex items-center gap-2">
+                    <button onclick="triggerExport('PDF Laporan Anomali')"
+                        class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200">
+                        <i class="fa-solid fa-file-pdf text-red-400 mr-1.5"></i>Unduh Berita Acara (PDF)
+                    </button>
+                    <button onclick="toggleAnomalyModal()"
+                        class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-xs font-semibold text-white">
+                        Tindak Lanjuti Sekarang
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION FOR EXPORT -->
+    <div id="export-toast"
+        class="fixed bottom-5 right-5 z-50 glass-card border border-emerald-500/50 bg-slate-900/95 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 hidden">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <div>
+            <div class="text-xs font-bold" id="toast-title">Berhasil Mengekspor Laporan</div>
+            <div class="text-[11px] text-slate-400" id="toast-desc">File sedang diunduh ke perangkat Anda...</div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. DATA GENERATOR (8 Core + 196 Generated = 204 Suppliers)
+        // ==========================================
+        const coreSuppliers = [
+            {
+                id: "SUP-001",
+                name: "PT Krakatau Baja Mitra",
+                city: "Surabaya",
+                region: "Jawa Timur",
+                coords: [-7.2575, 112.7521],
+                frequency: "Setiap 4 Hari",
+                freqDays: 4,
+                items: [
+                    { type: "Besi Scrap HMS", weight: 210, pricePerKg: 7500 },
+                    { type: "Tembaga Murni", weight: 45, pricePerKg: 115000 }
+                ],
+                standardTonnage: 370,
+                actualTonnage: 255, // DROP -115 Ton (ANOMALY!)
+                lastArrival: "11 Okt 2026",
+                nextForecast: "15 Okt 2026 (Hari Ini)",
+                status: "ANOMALY_DROP",
+                anomalyDetail: "Penurunan berat pengiriman signifikan sebesar -115 Ton dari standar histori (370 Ton → 255 Ton)."
+            },
+            {
+                id: "SUP-002",
+                name: "CV Logam Jaya Sentosa",
+                city: "Medan",
+                region: "Sumatera Utara",
+                coords: [3.5952, 98.6722],
+                frequency: "Setiap 5 Hari",
+                freqDays: 5,
+                items: [
+                    { type: "Tembaga Murni", weight: 0, pricePerKg: 112000 },
+                    { type: "Aluminium Ingot", weight: 180, pricePerKg: 32000 }
+                ],
+                standardTonnage: 260,
+                actualTonnage: 180,
+                lastArrival: "07 Okt 2026",
+                nextForecast: "12 Okt 2026 (Terlambat 3 Hari)",
+                status: "ANOMALY_LATE",
+                anomalyDetail: "Barang Macet: Tembaga Murni (80 Ton) jadwal tiba 12 Okt 2026 belum datang hingga hari ini."
+            },
+            {
+                id: "SUP-003",
+                name: "PT Borneo Metalindo Perkasa",
+                city: "Balikpapan",
+                region: "Kalimantan Timur",
+                coords: [-1.2379, 116.8529],
+                frequency: "Setiap 7 Hari",
+                freqDays: 7,
+                items: [
+                    { type: "Besi Scrap HMS", weight: 195, pricePerKg: 7400 },
+                    { type: "Kuningan", weight: 35, pricePerKg: 68000 }
+                ],
+                standardTonnage: 340,
+                actualTonnage: 230, // DROP -110 Ton (ANOMALY!)
+                lastArrival: "10 Okt 2026",
+                nextForecast: "17 Okt 2026",
+                status: "ANOMALY_DROP",
+                anomalyDetail: "Tonase pengiriman anjlok -110 Ton di bawah pola rata-rata mingguan (340 Ton → 230 Ton)."
+            },
+            {
+                id: "SUP-004",
+                name: "UD Riau Scrap Mandiri",
+                city: "Pekanbaru",
+                region: "Riau",
+                coords: [0.5071, 101.4478],
+                frequency: "Setiap 6 Hari",
+                freqDays: 6,
+                items: [
+                    { type: "Aluminium Scrap", weight: 140, pricePerKg: 28500 },
+                    { type: "Besi Scrap HMS", weight: 160, pricePerKg: 7600 }
+                ],
+                standardTonnage: 300,
+                actualTonnage: 300,
+                lastArrival: "06 Okt 2026",
+                nextForecast: "12 Okt 2026 (Terlambat 3 Hari)",
+                status: "ANOMALY_LATE",
+                anomalyDetail: "Jadwal pengiriman Aluminium & Besi Scrap terlambat 3 hari dari prediksi algoritma (12 Okt 2026)."
+            },
+            {
+                id: "SUP-005",
+                name: "PT Pasundan Smelting Raya",
+                city: "Bekasi",
+                region: "Jawa Barat",
+                coords: [-6.2383, 106.9756],
+                frequency: "Setiap 3 Hari",
+                freqDays: 3,
+                items: [
+                    { type: "Besi Scrap HMS", weight: 310, pricePerKg: 7650 },
+                    { type: "Nikel Kasar", weight: 65, pricePerKg: 145000 }
+                ],
+                standardTonnage: 370,
+                actualTonnage: 375,
+                lastArrival: "14 Okt 2026",
+                nextForecast: "17 Okt 2026",
+                status: "NORMAL",
+                anomalyDetail: "Pengiriman normal dan sesuai kuota."
+            },
+            {
+                id: "SUP-006",
+                name: "PT Celebes Metal Works",
+                city: "Makassar",
+                region: "Sulawesi Selatan",
+                coords: [-5.1477, 119.4327],
+                frequency: "Setiap 7 Hari",
+                freqDays: 7,
+                items: [
+                    { type: "Aluminium Ingot", weight: 210, pricePerKg: 31500 },
+                    { type: "Kuningan", weight: 50, pricePerKg: 67000 }
+                ],
+                standardTonnage: 255,
+                actualTonnage: 260,
+                lastArrival: "12 Okt 2026",
+                nextForecast: "19 Okt 2026",
+                status: "NORMAL",
+                anomalyDetail: "Tepat jadwal."
+            },
+            {
+                id: "SUP-007",
+                name: "CV Gresik Baja Utama",
+                city: "Gresik",
+                region: "Jawa Timur",
+                coords: [-7.1566, 112.6555],
+                frequency: "Setiap 4 Hari",
+                freqDays: 4,
+                items: [
+                    { type: "Besi Scrap HMS", weight: 420, pricePerKg: 7450 }
+                ],
+                standardTonnage: 410,
+                actualTonnage: 420,
+                lastArrival: "13 Okt 2026",
+                nextForecast: "17 Okt 2026",
+                status: "NORMAL",
+                anomalyDetail: "Tepat jadwal."
+            },
+            {
+                id: "SUP-008",
+                name: "PT Deli Serdang Alloy",
+                city: "Deli Serdang",
+                region: "Sumatera Utara",
+                coords: [3.5412, 98.8687],
+                frequency: "Setiap 5 Hari",
+                freqDays: 5,
+                items: [
+                    { type: "Tembaga Murni", weight: 90, pricePerKg: 114000 },
+                    { type: "Besi Scrap HMS", weight: 220, pricePerKg: 7500 }
+                ],
+                standardTonnage: 305,
+                actualTonnage: 310,
+                lastArrival: "13 Okt 2026",
+                nextForecast: "18 Okt 2026",
+                status: "NORMAL",
+                anomalyDetail: "Tepat jadwal."
+            }
+        ];
+
+        // Generate up to 204 suppliers for realistic database simulation
+        const allSuppliers = [...coreSuppliers];
+        const regionsPool = [
+            { city: "Surabaya", region: "Jawa Timur", coords: [-7.25, 112.75] },
+            { city: "Sidoarjo", region: "Jawa Timur", coords: [-7.44, 112.71] },
+            { city: "Medan", region: "Sumatera Utara", coords: [3.59, 98.67] },
+            { city: "Bekasi", region: "Jawa Barat", coords: [-6.23, 106.97] },
+            { city: "Karawang", region: "Jawa Barat", coords: [-6.30, 107.30] },
+            { city: "Pekanbaru", region: "Riau", coords: [0.50, 101.44] },
+            { city: "Balikpapan", region: "Kalimantan Timur", coords: [-1.23, 116.85] },
+            { city: "Makassar", region: "Sulawesi Selatan", coords: [-5.14, 119.43] }
+        ];
+        const metalPool = [
+            { type: "Besi Scrap HMS", pricePerKg: 7500 },
+            { type: "Aluminium Ingot", pricePerKg: 31000 },
+            { type: "Tembaga Murni", pricePerKg: 113000 },
+            { type: "Kuningan", pricePerKg: 67500 }
+        ];
+
+        for (let i = 9; i <= 204; i++) {
+            const reg = regionsPool[i % regionsPool.length];
+            const m1 = metalPool[i % metalPool.length];
+            const m2 = metalPool[(i + 1) % metalPool.length];
+            const w1 = 60 + ((i * 17) % 140);
+            const w2 = 30 + ((i * 13) % 80);
+            const totalW = w1 + w2;
+            allSuppliers.push({
+                id: `SUP-${String(i).padStart(3, "0")}`,
+                name: `PT Mitra Logam Nusantara ${i}`,
+                city: reg.city,
+                region: reg.region,
+                coords: [reg.coords[0] + (Math.sin(i) * 0.08), reg.coords[1] + (Math.cos(i) * 0.08)],
+                frequency: `Setiap ${(i % 7) + 3} Hari`,
+                freqDays: (i % 7) + 3,
+                items: [
+                    { type: m1.type, weight: w1, pricePerKg: m1.pricePerKg },
+                    { type: m2.type, weight: w2, pricePerKg: m2.pricePerKg }
+                ],
+                standardTonnage: totalW,
+                actualTonnage: totalW,
+                lastArrival: `${(i % 10) + 5} Okt 2026`,
+                nextForecast: `${(i % 10) + 16} Okt 2026`,
+                status: "NORMAL",
+                anomalyDetail: "Normal"
+            });
+        }
+
+        // Helper: Format Rupiah
+        function formatRupiah(num) {
+            return "Rp " + Math.round(num).toLocaleString("id-ID");
+        }
+
+        // Helper: Calculate Revenue of a Supplier's shipment (Weight in Tons -> * 1000 kg * pricePerKg -> scaled for realistic industrial batch)
+        function calcRevenue(supplier) {
+            // Using price per Ton = pricePerKg * 1000 (or realistic batch valuation)
+            return supplier.items.reduce((acc, item) => acc + (item.weight * 1000 * item.pricePerKg * 0.1), 0);
+        }
+
+        // ==========================================
+        // 2. RENDER ANOMALY CARDS & MODAL
+        // ==========================================
+        function renderAnomalies() {
+            const anomalies = allSuppliers.filter(s => s.status !== "NORMAL");
+            const container = document.getElementById("anomaly-cards-container");
+            const modalList = document.getElementById("modal-anomaly-list");
+
+            container.innerHTML = anomalies.map(s => {
+                const isDrop = s.status === "ANOMALY_DROP";
+                const diff = s.actualTonnage - s.standardTonnage;
+                return `
+          <div class="p-3.5 rounded-xl bg-slate-900/95 border ${isDrop ? 'border-red-500/50' : 'border-amber-500/50'} flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between gap-2 mb-1.5">
+                <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded ${isDrop ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}">
+                  ${isDrop ? '<i class="fa-solid fa-arrow-trend-down mr-1"></i>Drop Tonase (' + diff + ' Ton)' : '<i class="fa-solid fa-clock mr-1"></i>Jadwal Macet'}
+                </span>
+                <span class="text-[11px] text-slate-400 font-mono">${s.id}</span>
+              </div>
+              <div class="font-bold text-sm text-white">${s.name}</div>
+              <div class="text-[11px] text-slate-400 mb-2"><i class="fa-solid fa-location-dot mr-1 text-slate-500"></i>${s.city}, ${s.region}</div>
+              <p class="text-xs text-slate-300 leading-snug">${s.anomalyDetail}</p>
+            </div>
+            <div class="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
+              <span class="text-slate-400">Target: <strong class="text-white">${s.standardTonnage}T</strong> | Aktual: <strong class="text-red-400">${s.actualTonnage}T</strong></span>
+              <button onclick="toggleAnomalyModal()" class="text-blue-400 hover:underline font-semibold">Detail &rarr;</button>
+            </div>
+          </div>
+        `;
+            }).join("");
+
+            modalList.innerHTML = anomalies.map(s => `
+        <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-red-400">[${s.id}] ${s.name}</span>
+              <span class="text-[11px] bg-slate-800 px-2 py-0.5 rounded text-slate-300">${s.city}</span>
+            </div>
+            <p class="text-xs text-slate-200 mt-1">${s.anomalyDetail}</p>
+            <p class="text-[11px] text-slate-400 mt-1">Frekuensi: ${s.frequency} • Pengiriman Terakhir: ${s.lastArrival}</p>
+          </div>
+          <div class="flex sm:flex-col gap-1.5 shrink-0">
+            <button onclick="alert('Peringatan WhatsApp & Email otomatis telah dikirim ke PIC ' + '${s.name}')" class="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 text-xs font-semibold border border-red-500/30">
+              <i class="fa-solid fa-paper-plane mr-1"></i>Tegur Supplier
+            </button>
+          </div>
+        </div>
+      `).join("");
+        }
+
+        function toggleAnomalyModal() {
+            const modal = document.getElementById("anomaly-modal");
+            modal.classList.toggle("hidden");
+        }
+
+        // ==========================================
+        // 3. RENDER TABLES (DASHBOARD, SUPPLIERS, FORECAST, REVENUE)
+        // ==========================================
+        function renderDashboardMatrix() {
+            const tbody = document.getElementById("dashboard-matrix-body");
+            tbody.innerHTML = coreSuppliers.map(s => {
+                const rev = calcRevenue(s);
+                const diff = s.actualTonnage - s.standardTonnage;
+                let badge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Normal • Tepat</span>`;
+                if (s.status === "ANOMALY_DROP") {
+                    badge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-red-500/20 text-red-300 border border-red-500/40"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Anomali (${diff} Ton)</span>`;
+                } else if (s.status === "ANOMALY_LATE") {
+                    badge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40"><i class="fa-solid fa-clock mr-1"></i>Barang Macet</span>`;
+                }
+
+                return `
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="py-3 px-3">
+              <div class="font-semibold text-white">${s.name}</div>
+              <div class="text-[11px] text-slate-400">${s.city}, ${s.region}</div>
+            </td>
+            <td class="py-3 px-3 text-slate-300">${s.frequency}</td>
+            <td class="py-3 px-3">
+              ${s.items.map(i => `<div class="text-[11px] text-slate-200">• ${i.type}: <strong>${i.weight} Ton</strong></div>`).join("")}
+            </td>
+            <td class="py-3 px-3">
+              <span class="font-bold ${diff <= -100 ? 'text-red-400' : 'text-white'}">${s.actualTonnage} Ton</span>
+              <span class="text-[11px] text-slate-400 block">Standar: ${s.standardTonnage} Ton</span>
+            </td>
+            <td class="py-3 px-3">
+              ${s.items.map(i => `<div class="text-[11px] text-slate-300">Rp ${i.pricePerKg.toLocaleString('id-ID')}/kg</div>`).join("")}
+            </td>
+            <td class="py-3 px-3 font-semibold text-amber-400">${formatRupiah(rev)}</td>
+            <td class="py-3 px-3">
+              <div class="font-medium text-purple-300">${s.nextForecast}</div>
+              <div class="text-[10px] text-slate-400">Terakhir: ${s.lastArrival}</div>
+            </td>
+            <td class="py-3 px-3">${badge}</td>
+          </tr>
+        `;
+            }).join("");
+        }
+
+        function renderSupplierList() {
+            const q = document.getElementById("supplier-search").value.toLowerCase();
+            const statusFilter = document.getElementById("supplier-filter-status").value;
+            const regionFilter = document.getElementById("supplier-filter-region").value;
+
+            const filtered = allSuppliers.filter(s => {
+                const matchQ = s.name.toLowerCase().includes(q) || s.city.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || s.items.some(i => i.type.toLowerCase().includes(q));
+                const matchStatus = statusFilter === "ALL" || (statusFilter === "ANOMALY" && s.status !== "NORMAL") || (statusFilter === "NORMAL" && s.status === "NORMAL");
+                const matchRegion = regionFilter === "ALL" || s.region === regionFilter;
+                return matchQ && matchStatus && matchRegion;
+            });
+
+            const tbody = document.getElementById("full-supplier-tbody");
+            tbody.innerHTML = filtered.slice(0, 60).map(s => {
+                const rev = calcRevenue(s);
+                return `
+          <tr class="hover:bg-slate-800/40">
+            <td class="py-2.5 px-3">
+              <span class="font-mono text-[11px] text-blue-400">${s.id}</span>
+              <div class="font-semibold text-white">${s.name}</div>
+            </td>
+            <td class="py-2.5 px-3">
+              <div class="text-slate-200">${s.city}, ${s.region}</div>
+              <div class="text-[10px] text-slate-400 font-mono">Lat: ${s.coords[0].toFixed(3)}, Lng: ${s.coords[1].toFixed(3)}</div>
+            </td>
+            <td class="py-2.5 px-3 text-slate-300">${s.frequency}</td>
+            <td class="py-2.5 px-3">
+              ${s.items.map(i => `<span class="inline-block bg-slate-800 px-2 py-0.5 rounded text-[11px] mr-1 mb-1">${i.type}: <b>${i.weight}T</b></span>`).join("")}
+            </td>
+            <td class="py-2.5 px-3 font-bold text-white">${s.actualTonnage} Ton</td>
+            <td class="py-2.5 px-3 text-slate-300">
+              ${s.items.map(i => `<div class="text-[11px]">Rp ${i.pricePerKg.toLocaleString('id-ID')}/kg</div>`).join("")}
+            </td>
+            <td class="py-2.5 px-3 font-semibold text-emerald-400">${formatRupiah(rev)}</td>
+            <td class="py-2.5 px-3">
+              ${s.status === "NORMAL"
+                        ? `<span class="text-[11px] text-emerald-400">Aktif</span>`
+                        : `<span class="text-[11px] text-red-400 font-bold">Anomali / Macet</span>`}
+            </td>
+          </tr>
+        `;
+            }).join("");
+        }
+
+        function renderForecastAndRevenue() {
+            // Forecast Table
+            const fBody = document.getElementById("forecast-table-body");
+            fBody.innerHTML = coreSuppliers.map((s, idx) => `
+        <tr class="hover:bg-slate-800/40">
+          <td class="py-3 px-3 font-semibold text-white">${s.name} <span class="text-slate-400 font-normal">(${s.city})</span></td>
+          <td class="py-3 px-3 text-slate-300">${s.frequency} (±0.4 hari)</td>
+          <td class="py-3 px-3 text-slate-300">${s.lastArrival}</td>
+          <td class="py-3 px-3 font-semibold text-purple-300">${s.nextForecast}</td>
+          <td class="py-3 px-3 text-white font-bold">${s.standardTonnage} Ton</td>
+          <td class="py-3 px-3 text-emerald-400 font-semibold">${96 - idx}%</td>
+          <td class="py-3 px-3">
+            ${s.status === "ANOMALY_LATE"
+                    ? `<span class="px-2 py-0.5 rounded bg-red-500/20 text-red-300 text-[11px]">Lewat Jadwal</span>`
+                    : `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[11px]">Terjadwal</span>`}
+          </td>
+        </tr>
+      `).join("");
+
+            // Shipment Revenue Table
+            const rBody = document.getElementById("shipment-revenue-body");
+            rBody.innerHTML = coreSuppliers.map((s, idx) => {
+                const rev = calcRevenue(s);
+                const diffTon = s.actualTonnage - s.standardTonnage;
+                return `
+          <tr class="hover:bg-slate-800/40">
+            <td class="py-3 px-3">
+              <div class="font-mono text-xs text-blue-400">SHP-202610-${108 + idx}</div>
+              <div class="text-[11px] text-slate-400">${s.lastArrival}</div>
+            </td>
+            <td class="py-3 px-3">
+              <div class="font-semibold text-white">${s.name}</div>
+              <div class="text-[11px] text-slate-400">${s.city}, ${s.region}</div>
+            </td>
+            <td class="py-3 px-3">
+              ${s.items.map(i => `<div class="text-[11px] text-slate-200">${i.type}: <strong>${i.weight} Ton</strong></div>`).join("")}
+            </td>
+            <td class="py-3 px-3 font-bold text-white">${s.actualTonnage} Ton</td>
+            <td class="py-3 px-3">
+              ${s.items.map(i => `<div class="text-[11px] text-slate-300">Rp ${i.pricePerKg.toLocaleString('id-ID')}/kg</div>`).join("")}
+            </td>
+            <td class="py-3 px-3 font-bold text-amber-400 text-sm">${formatRupiah(rev)}</td>
+            <td class="py-3 px-3">
+              ${diffTon < 0
+                        ? `<span class="text-red-400 font-semibold">${diffTon} Ton (Turun Drastis)</span>`
+                        : `<span class="text-emerald-400 font-semibold">+${diffTon} Ton (Stabil)</span>`}
+            </td>
+          </tr>
+        `;
+            }).join("");
+        }
+
+        // ==========================================
+        // 4. EXPANSION AI RANKING & LEAFLET MAP
+        // ==========================================
+        const regionalExpansionData = [
+            {
+                region: "Jawa Timur (Surabaya - Gresik)",
+                totalSuppliers: 54,
+                monthlyTonnage: "6.420 Ton",
+                score: 94.8,
+                status: "SANGAT DIREKOMENDASIKAN (Buka Cabang Baru)",
+                color: "emerald",
+                coords: [-7.2575, 112.7521]
+            },
+            {
+                region: "Sumatera Utara (Medan - Deli Serdang)",
+                totalSuppliers: 41,
+                monthlyTonnage: "4.180 Ton",
+                score: 88.5,
+                status: "DIREKOMENDASIKAN (Tambah Hub Gudang)",
+                color: "blue",
+                coords: [3.5952, 98.6722]
+            },
+            {
+                region: "Riau (Pekanbaru - Dumai)",
+                totalSuppliers: 29,
+                monthlyTonnage: "2.890 Ton",
+                score: 79.4,
+                status: "POTENSIAL KUARTAL DEPAN",
+                color: "amber",
+                coords: [0.5071, 101.4478]
+            },
+            {
+                region: "Kalimantan Timur (Balikpapan)",
+                totalSuppliers: 24,
+                monthlyTonnage: "2.150 Ton",
+                score: 71.2,
+                status: "MONITORING STABILITAS",
+                color: "slate",
+                coords: [-1.2379, 116.8529]
+            }
+        ];
+
+        function renderExpansionCards() {
+            const container = document.getElementById("expansion-ranking-cards");
+            container.innerHTML = regionalExpansionData.map((r, i) => `
+        <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-bold text-xs text-white">#${i + 1} ${r.region}</span>
+            <span class="text-xs font-bold text-emerald-400">Skor EVI: ${r.score}%</span>
+          </div>
+          <div class="text-[11px] text-slate-400 mb-2">
+            Total Tonase: <strong class="text-slate-200">${r.monthlyTonnage}/bln</strong> • Populasi: <strong class="text-slate-200">${r.totalSuppliers} Supplier</strong>
+          </div>
+          <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mb-2">
+            <div class="bg-emerald-500 h-full" style="width: ${r.score}%"></div>
+          </div>
+          <div class="text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+            <i class="fa-solid fa-circle-check mr-1"></i>${r.status}
+          </div>
+        </div>
+      `).join("");
+        }
+
+        let leafletMap = null;
+        function initMap() {
+            if (leafletMap) {
+                setTimeout(() => leafletMap.invalidateSize(), 200);
+                return;
+            }
+            leafletMap = L.map("map").setView([-2.5, 113.0], 5);
+            L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+                attribution: "&copy; OpenStreetMap"
+            }).addTo(leafletMap);
+
+            // Add high-tonnage cluster circles
+            regionalExpansionData.forEach(r => {
+                L.circle(r.coords, {
+                    color: r.score > 85 ? "#10b981" : "#f59e0b",
+                    fillColor: r.score > 85 ? "#10b981" : "#f59e0b",
+                    fillOpacity: 0.25,
+                    radius: r.score * 2200
+                }).addTo(leafletMap).bindPopup(`
+          <div style="color:#0f172a; font-family:sans-serif;">
+            <strong>${r.region}</strong><br/>
+            Tonase Wilayah: <b>${r.monthlyTonnage}</b><br/>
+            Jumlah Supplier: <b>${r.totalSuppliers}</b><br/>
+            Rekomendasi AI: <b>${r.status} (${r.score}%)</b>
+          </div>
+        `);
+            });
+
+            // Add individual core supplier pins
+            coreSuppliers.forEach(s => {
+                const marker = L.circleMarker(s.coords, {
+                    radius: 6,
+                    fillColor: s.status === "NORMAL" ? "#3b82f6" : "#ef4444",
+                    color: "#fff",
+                    weight: 1.5,
+                    fillOpacity: 1
+                }).addTo(leafletMap);
+                marker.bindPopup(`
+          <div style="color:#0f172a; font-family:sans-serif;">
+            <strong>${s.name}</strong> (${s.city})<br/>
+            Tonase Aktual: <b>${s.actualTonnage} Ton</b><br/>
+            Frekuensi: ${s.frequency}
+          </div>
+        `);
+            });
+        }
+
+        // ==========================================
+        // 5. CHARTS INITIALIZATION
+        // ==========================================
+        function initCharts() {
+            const ctx1 = document.getElementById("mainForecastChart").getContext("2d");
+            new Chart(ctx1, {
+                type: "line",
+                data: {
+                    labels: ["Minggu 1 Sep", "Minggu 2 Sep", "Minggu 3 Sep", "Minggu 4 Sep", "Minggu 1 Okt", "Minggu 2 Okt (Anomali)", "Minggu 3 Okt (Forecast)", "Minggu 4 Okt (Forecast)"],
+                    datasets: [
+                        {
+                            label: "Tonase Aktual (Ton)",
+                            data: [4250, 4410, 4380, 4590, 4620, 4110, null, null],
+                            borderColor: "#3b82f6",
+                            backgroundColor: "rgba(59, 130, 246, 0.15)",
+                            borderWidth: 2.5,
+                            tension: 0.35,
+                            fill: true,
+                            pointBackgroundColor: ["#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#3b82f6", "#ef4444"],
+                            pointRadius: [4, 4, 4, 4, 4, 7]
+                        },
+                        {
+                            label: "Prediksi AI (Forecasting)",
+                            data: [4200, 4350, 4420, 4550, 4600, 4650, 4780, 4910],
+                            borderColor: "#a855f7",
+                            borderDash: [6, 4],
+                            borderWidth: 2,
+                            tension: 0.35,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { grid: { color: "rgba(255,255,255,0.05)" }, ticks: { color: "#94a3b8" } },
+                        x: { grid: { display: false }, ticks: { color: "#94a3b8", font: { size: 11 } } }
+                    }
+                }
+            });
+
+            const ctx2 = document.getElementById("metalCompositionChart").getContext("2d");
+            new Chart(ctx2, {
+                type: "doughnut",
+                data: {
+                    labels: ["Besi Scrap (HMS)", "Aluminium", "Tembaga (Cu)", "Kuningan & Nikel"],
+                    datasets: [{
+                        data: [8240, 4520, 3110, 2550],
+                        backgroundColor: ["#3b82f6", "#6366f1", "#ef4444", "#f59e0b"],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: "68%",
+                    plugins: {
+                        legend: { position: "right", labels: { color: "#cbd5e1", boxWidth: 12, font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        // ==========================================
+        // 6. TAB NAVIGATION & EXPORT SIMULATION
+        // ==========================================
+        function switchTab(tabId) {
+            const sections = ["dashboard", "suppliers", "forecasting", "revenue", "expansion"];
+            sections.forEach(s => {
+                document.getElementById(`sec-${s}`).classList.add("hidden");
+                const btn = document.getElementById(`tab-${s}`);
+                btn.classList.remove("bg-blue-600", "text-white", "shadow");
+                btn.classList.add("text-slate-400");
+            });
+
+            document.getElementById(`sec-${tabId}`).classList.remove("hidden");
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            activeBtn.classList.add("bg-blue-600", "text-white", "shadow");
+            activeBtn.classList.remove("text-slate-400");
+
+            if (tabId === "expansion") {
+                initMap();
+            }
+        }
+
+        function triggerExport(formatName) {
+            const toast = document.getElementById("export-toast");
+            document.getElementById("toast-title").innerText = `Mengekspor ke ${formatName}`;
+            document.getElementById("toast-desc").innerText = `Laporan 204 supplier, matriks anomali & grafik berhasil di-generate.`;
+            toast.classList.remove("hidden");
+
+            // If CSV/Excel is selected, also trigger a real CSV download of the supplier database
+            if (formatName.includes("Excel")) {
+                let csv = "ID,Nama Supplier,Kota,Wilayah,Frekuensi,Total Tonase (Ton),Standar Tonase (Ton),Status\n";
+                allSuppliers.forEach(s => {
+                    csv += `${s.id},"${s.name}",${s.city},${s.region},${s.frequency},${s.actualTonnage},${s.standardTonnage},${s.status}\n`;
+                });
+                const blob = new Blob([csv], { type: "text/csv" });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "Laporan_Supplier_Logam_204_Data.csv";
+                a.click();
+            } else if (formatName.includes("PDF")) {
+                window.print();
+            }
+
+            setTimeout(() => {
+                toast.classList.add("hidden");
+            }, 4000);
+        }
+
+        // Initialize everything on load
+        window.addEventListener("DOMContentLoaded", () => {
+            renderAnomalies();
+            renderDashboardMatrix();
+            renderSupplierList();
+            renderForecastAndRevenue();
+            renderExpansionCards();
+            initCharts();
+        });
+    </script>
+</body>
+
+</html>
