@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/leonza26/RTMServer_Monitoring/backend/internal/response"
 )
 
 // HealthHandler menangani endpoint health check.
@@ -25,7 +27,7 @@ type healthData struct {
 
 // Check menangani GET /api/health.
 func (h *HealthHandler) Check(c *gin.Context) {
-	Success(c, http.StatusOK, healthData{
+	response.Success(c, http.StatusOK, healthData{
 		Status: "ok",
 		App:    "RTMS_Monitoring",
 		Uptime: time.Since(h.startedAt).Round(time.Second).String(),

@@ -9,6 +9,7 @@ import (
 
 	"github.com/leonza26/RTMServer_Monitoring/backend/internal/config"
 	"github.com/leonza26/RTMServer_Monitoring/backend/internal/middleware"
+	"github.com/leonza26/RTMServer_Monitoring/backend/internal/response"
 )
 
 // NewRouter menyusun Gin engine beserta seluruh route aplikasi.
@@ -27,7 +28,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger) (*gin.Engine, error) {
 		middleware.RequestID(),
 		middleware.Logger(logger),
 		gin.CustomRecovery(func(c *gin.Context, _ any) {
-			Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error")
+			response.Error(c, http.StatusInternalServerError, "INTERNAL_ERROR", "Internal server error")
 		}),
 	)
 
@@ -37,12 +38,13 @@ func NewRouter(cfg *config.Config, logger *slog.Logger) (*gin.Engine, error) {
 	}
 
 	router.NoRoute(func(c *gin.Context) {
-		Error(c, http.StatusNotFound, "ROUTE_NOT_FOUND", "Route not found")
+		response.Error(c, http.StatusNotFound, "ROUTE_NOT_FOUND", "Route not found")
 	})
 
 	health := NewHealthHandler()
 
 	api := router.Group("/api")
+
 	api.GET("/health", health.Check)
 
 	return router, nil
