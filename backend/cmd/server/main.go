@@ -1,13 +1,21 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/leonza26/RTMServer_Monitoring/backend/internal/config"
 	"github.com/leonza26/RTMServer_Monitoring/backend/internal/handler"
 )
+
+const shutdownTimeout = 10 * time.Second
 
 func main() {
 	cfg, err := config.Load()
@@ -25,15 +33,51 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("starting server",
-		slog.String("addr", cfg.App.Addr()),
-		slog.String("env", cfg.App.Env),
-	)
-
-	if err := router.Run(cfg.App.Addr()); err != nil {
-		logger.Error("server stopped", slog.Any("error", err))
-		os.Exit(1)
+	srv := &http.Server{
+		Addr:              cfg.App.Addr(),
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second, // lindungi dari client yang sengaja mengirim header sangat lambat
 	}
+
+	// ctx otomatis "selesai" saat program menerima CtrlC (SIGINT) atau SIGTERM (dari systemd).
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Jalankan server di goroutine supaya main() bisa lanjut ke bawah dan menunggu sinyal.
+	serverErr := make(chan error, 1)
+	go func() {
+		logger.Info("starting server",
+			slog.String("addr", srv.Addr),
+			slog.String("env", cfg.App.Env),
+		)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+	}()
+
+	// Tunggu salah satu: server gagal start, ATAU ada sinyal berhenti.
+	select {
+	case err := <-serverErr:
+		logger.Error("server failed", slog.Any("error", err))
+		os.Exit(1)
+	case <-ctx.Done():
+		logger.Info("shutdown signal received")
+	}
+
+	// Kembalikan perilaku CtrlC normal: tekan sekali lagi untuk paksa keluar.
+	stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("graceful shutdown timed out, forcing close", slog.Any("error", err))
+		_ = srv.Close()
+	}
+
+	// Phase 2: tutup koneksi database di sini.
+
+	logger.Info("server stopped gracefully")
 }
 
 // newLogger membuat logger: format teks (mudah dibaca) untuk development,
