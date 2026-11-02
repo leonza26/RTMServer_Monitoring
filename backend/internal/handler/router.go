@@ -13,7 +13,7 @@ import (
 )
 
 // NewRouter menyusun Gin engine beserta seluruh route aplikasi.
-func NewRouter(cfg *config.Config, logger *slog.Logger) (*gin.Engine, error) {
+func NewRouter(cfg *config.Config, logger *slog.Logger, db Pinger) (*gin.Engine, error) {
 	if cfg.App.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -41,7 +41,7 @@ func NewRouter(cfg *config.Config, logger *slog.Logger) (*gin.Engine, error) {
 		response.Error(c, http.StatusNotFound, "ROUTE_NOT_FOUND", "Route not found")
 	})
 
-	health := NewHealthHandler()
+	health := NewHealthHandler(db)
 
 	api := router.Group("/api")
 

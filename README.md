@@ -69,8 +69,8 @@ RTMServer_Monitoring/
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Environment setup | ✅ |
-| 1 | Go API foundation | 🚧 |
-| 2 | PostgreSQL | ⏳ |
+| 1 | Go API foundation | ✅ |
+| 2 | PostgreSQL | 🚧 |
 | 3 | Authentication | ⏳ |
 | 4 | React dashboard | ⏳ |
 | 5 | Go agent | ⏳ |

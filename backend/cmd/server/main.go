@@ -13,6 +13,7 @@ import (
 
 	"github.com/leonza26/RTMServer_Monitoring/backend/internal/config"
 	"github.com/leonza26/RTMServer_Monitoring/backend/internal/handler"
+	"github.com/leonza26/RTMServer_Monitoring/backend/internal/repository"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -27,7 +28,18 @@ func main() {
 	logger := newLogger(cfg.App)
 	slog.SetDefault(logger)
 
-	router, err := handler.NewRouter(cfg, logger)
+	dbPool, err := repository.NewPostgresPool(context.Background(), cfg.Database)
+	if err != nil {
+		logger.Error("failed to connect to database", slog.Any("error", err))
+		os.Exit(1)
+	}
+	logger.Info("connected to PostgreSQL",
+		slog.String("host", cfg.Database.Host),
+		slog.Int("port", cfg.Database.Port),
+		slog.String("db", cfg.Database.Name),
+	)
+
+	router, err := handler.NewRouter(cfg, logger, dbPool)
 	if err != nil {
 		logger.Error("failed to create router", slog.Any("error", err))
 		os.Exit(1)
@@ -75,7 +87,8 @@ func main() {
 		_ = srv.Close()
 	}
 
-	// Phase 2: tutup koneksi database di sini.
+	dbPool.Close()
+	logger.Info("database connection pool closed")
 
 	logger.Info("server stopped gracefully")
 }
